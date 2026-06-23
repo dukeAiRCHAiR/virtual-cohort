@@ -190,86 +190,35 @@
   </div>
 
 <script>
-  // ============================================================
-  // PASTE YOUR VIRTUAL COHORT "Publish to web" CSV LINK HERE
-  // (Cohort Ticker tab, .csv format)  ↓↓↓
-  const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRyFWEOX-N49M19BiQkwk_VXnDD0rb2Q0aImgLVd--ghOdTpjNrEX8TeYQw-NiN7rFvrTBJJxejWbWT/pub?gid=85866931&single=true&output=csv";
-  // ============================================================
-
-  const REFRESH_MS = 60000; // re-pull every 60s
-
-  const $ = id => document.getElementById(id);
-
-  // Smoothly count a number up to its target
-  function animateTo(el, target){
-    const start = parseInt(el.textContent.replace(/[^0-9]/g,'')) || 0;
-    if (start === target){ el.textContent = target; return; }
-    const dur = 600, t0 = performance.now();
-    function step(t){
-      const p = Math.min((t - t0)/dur, 1);
-      const eased = 1 - Math.pow(1 - p, 3);
-      el.textContent = Math.round(start + (target - start) * eased);
-      if (p < 1) requestAnimationFrame(step);
-    }
-    requestAnimationFrame(step);
-  }
-
-  function setStatus(state, text){
-    const d = $('sdot');
-    d.className = 'status-dot' + (state === 'ok' ? ' ok' : state === 'warn' ? ' warn' : '');
-    $('status').textContent = text;
-  }
-
-  // Parse the Cohort Ticker tab CSV into {projects, skills, tools, participants}
-  function parse(csv){
-    const rows = csv.split(/\r?\n/).map(r => r.split(',').map(c => c.trim()));
-    let projects = 0, skills = 0, tools = 0, participants = null;
-
-    for (let i = 0; i < rows.length; i++){
-      const joined = rows[i].join(' ').toLowerCase();
-
-      // The header row contains the three metric labels; values are on the next row
-      if (joined.includes('new projects') && joined.includes('skills created')){
-        const vals = (rows[i+1] || []).map(v => parseInt(v.replace(/[^0-9-]/g,'')) ).filter(n => !isNaN(n));
-        if (vals.length >= 3){ projects = vals[0]; skills = vals[1]; tools = vals[2]; }
-      }
-      // "N participants logging"
-      const m = joined.match(/(\d+)\s*participants?/);
-      if (m) participants = parseInt(m[1]);
-    }
-    return { projects, skills, tools, participants };
-  }
-
-  async function pull(){
-    if (!CSV_URL){
-      setStatus('warn', 'Awaiting sheet link');
-      return;
-    }
+(function(){
+  var CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRyFWEOX-N49M19BiQkwk_VXnDD0rb2Q0aImgLVd--ghOdTpjNrEX8TeYQw-NiN7rFvrTBJJxejWbWT/pub?gid=85866931&single=true&output=csv";
+  var $=function(id){return document.getElementById(id);};
+  function pl(line){var o=[],cur="",q=false;for(var i=0;i<line.length;i++){var ch=line[i];if(ch===String.fromCharCode(34)){if(q&&line[i+1]===String.fromCharCode(34)){cur+=String.fromCharCode(34);i++;}else{q=!q;}}else if(ch===","&&!q){o.push(cur);cur="";}else{cur+=ch;}}o.push(cur);return o;}
+  async function load(){
     try{
-      const res = await fetch(CSV_URL + (CSV_URL.includes('?') ? '&' : '?') + '_=' + Date.now(), {cache:'no-store'});
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const csv = await res.text();
-      const d = parse(csv);
-
-      animateTo($('m-projects'), d.projects);
-      animateTo($('m-skills'),   d.skills);
-      animateTo($('m-tools'),    d.tools);
-      animateTo($('total'),      d.projects + d.skills + d.tools);
-
-      if (d.participants != null){
-        $('participants').textContent = d.participants + ' participants logging';
-      }
-      setStatus('ok', 'Updated ' + new Date().toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}));
-    } catch(err){
-      setStatus('warn', 'Could not reach sheet');
-      console.error(err);
+      var u=CSV_URL+(CSV_URL.indexOf("?")>-1?"&":"?")+"cb="+Date.now();
+      var res=await fetch(u,{cache:"no-store"});
+      if(!res.ok) throw new Error("HTTP "+res.status);
+      var csv=await res.text();
+      var rows=csv.split(/\r?\n/).filter(function(r){return r.trim();}).map(pl);
+      var data=rows.slice(1).filter(function(r){return (r[0]||"").trim();});
+      var p=0,s=0,t=0;
+      data.forEach(function(r){p+=parseFloat(r[1])||0;s+=parseFloat(r[2])||0;t+=parseFloat(r[3])||0;});
+      $("m-projects").textContent=p;$("m-skills").textContent=s;$("m-tools").textContent=t;
+      $("total").textContent=p+s+t;
+      $("participants").textContent=data.length+" participants logging";
+      var d=new Date(),h=d.getHours(),m=String(d.getMinutes()).padStart(2,"0"),ap=h>=12?"PM":"AM";h=h%12||12;
+      $("status").textContent="Updated "+h+":"+m+" "+ap;
+      var dot=$("sdot"); if(dot) dot.style.background="#2e7d32";
+    }catch(e){
+      $("status").textContent="Connecting"+String.fromCharCode(8230);
+      var dot=$("sdot"); if(dot) dot.style.background="#bbb";
     }
   }
-
-  $('refresh').addEventListener('click', () => { setStatus('', 'Refreshing…'); pull(); });
-
-  pull();
-  setInterval(pull, REFRESH_MS);
+  var rb=$("refresh"); if(rb) rb.addEventListener("click",load);
+  load(); setInterval(load,60000);
+})();
 </script>
+<!-- cohort-fix-v2 -->
 </body>
 </html>
